@@ -1,0 +1,35 @@
+{
+  "name": "Edward Professional Planner",
+  "version": "1.0.0",
+  "description": "Capagemini open banking Hackathon challenge Edit",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vamsikt/edward-professional-planner.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vamsikt/edward-professional-planner/issues"
+  },
+  "homepage": "https://github.com/vamsikt/edward-professional-planner#readme",
+  "dependencies": {
+    "api.ai": "^1.0.3",
+    "apiai": "^4.0.3",
+    "body-parser": "^1.18.2",
+    "clarifai": "^2.5.0",
+    "express": "^4.16.2",
+    "moment": "^2.19.1",
+    "moment-timezone": "^0.5.14",
+    "ngrok": "^2.2.22",
+    "request": "^2.83.0",
+    "shopify-api-node": "^2.8.0"
+  },
+  "devDependencies": {
+    "nodemon": "^1.12.1"
+  }
+}
