@@ -1,0 +1,19 @@
+{
+
+ "page_access_token":"EAAdKIbZApZBXEBAL11ClaWmK6YM8JndZCrLeTsLAkQZBZBlaurge1Jyje36Xnlvj142I7UwcBTqyGXZBqoP7FnLSO0ekUxZA9jKDufiPPFFQRPowwo9Ku5COplAFUvqUCxs1FRfX4EYtGG7MlsG0f6g3hb9EJZBmnvl5Kw9ZC9mZA9nwpqZBFlJJJjw",
+  
+ "clientId": "",
+  "clientSecret": "",
+  "redirectUri": "",
+  "configurationEndpoint": "",
+  "api_uri": "",
+  "realmId": "",
+  "refresh_token": "",
+  "api_ai_token":"",
+  "fb_validation_token":"smallbizTo",
+  "qb_access_token": "",
+  "fintech_config":{
+  "apikey":"",
+    "accesskey":""
+  }
+}
