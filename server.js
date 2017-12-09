@@ -18,6 +18,17 @@ const str2json = require("string-to-json");
 const HashMap = require("hashmap").HashMap;
 const _ = require("underscore");
 var map = new HashMap();
+const MongoClient = require("mongodb").MongoClient;
+const MONGO_URL =config.mlab_url;
+  ;
+var db;
+MongoClient.connect(MONGO_URL, (err, database) => {
+  if (err) return console.log(err);
+  db = database;
+  app.listen(3000, () => {
+    console.log("listening on 3000");
+  });
+});
 
 app.set("port", process.env.PORT || 5000);
 let currentTime = moment_tz();
@@ -26,6 +37,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 const today_date = moment().format("YYYY-MM-DD");
 //Server start
+app.use(express.static(__dirname + "/public"));
+
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(
     "Express server listening on port %d in %s mode",
@@ -52,6 +65,22 @@ app.get("/webhook", function(req, res) {
     console.error("Failed validation. Make sure the validation tokens match.");
     res.sendStatus(403);
   }
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+  // Note: __dirname is directory that contains the JavaScript source code. Try logging it and see what you get!
+  // Mine was '/Users/zellwk/Projects/demo-repos/crud-express-mongo' for this app.
+});
+
+app.post("/login", (req, res) => {
+  console.log(req.body);
+  db.collection("login").save(req.body, (err, result) => {
+    if (err) return console.log(err);
+
+    console.log("saved to database");
+    res.sendFile(__dirname + "/public/lender_home.html");
+  });
 });
 
 /* handle fb webhook incoming messages */
@@ -143,8 +172,12 @@ function receivedQuickReply(event) {
   console.log("quickReplyAction->" + quickReplyAction.Action);
   switch (quickReplyAction.Action) {
     case "Course_Search":
-      console.log("quickReplyAction-Title>" + quickReplyAction.Title);
       prepareCourseList(senderID, quickReplyAction.Title);
+      break;
+      case "PayNow":
+      console.log("quickReplyAction-Loan>" + quickReplyAction);
+      case "Loan":
+      console.log("quickReplyAction-Loan>" + quickReplyAction);
       break;
 
     default:
@@ -237,7 +270,7 @@ function receivedMessage(event, userName) {
           break;
 
         case "recommend":
-          //get_Recommendation(sender, aiParameters);
+          prepareCourseList(sender, aiParameters.field_type);
           break;
 
         default:
@@ -358,36 +391,47 @@ function prepareCourseList(recipientId, searchTags) {
       //var courseList = data.courses;
       var searchCourse = searchTags.replace("_", " ").toUpperCase();
       console.log("searchCourse-" + searchCourse);
-  var order_Level = ["beginner", "intermediate", "advanced", undefined];
-  var courseList = _.sortBy(data.courses, function(obj){ 
-      return _.indexOf(order_Level, obj.level);
-  });
+      var order_Level = ["beginner", "intermediate", "advanced", undefined];
+      var courseList = _.sortBy(data.courses, function(obj) {
+        return _.indexOf(order_Level, obj.level);
+      });
 
-     courseList.forEach(function(course) {
+      courseList.forEach(function(course) {
         if (
           course.title.toUpperCase().indexOf(searchCourse) > -1 ||
-          course.subtitle.toUpperCase().indexOf(searchCourse) > -1 
-          ||
+          course.subtitle.toUpperCase().indexOf(searchCourse) > -1 ||
           course.tags
             .toString()
             .toUpperCase()
             .indexOf(searchCourse) > -1
         ) {
-            var course_level = course.level ?course.level:"Not Avaliable";
+          var coursecost = Math.floor(Math.random() * 1300) + 400;
+          var course_level = course.level ? course.level : "Not Avaliable";
           templateElements.push({
             title: course.title,
-            subtitle: course.subtitle + "\n Level : " + course_level,
+            subtitle:
+              course.subtitle +
+              "\n Level : " +
+              course_level +
+              "\n Cost :" +
+              coursecost,
             image_url: course.image,
             buttons: [
-              sectionButton("Add to cart", "add_cart", { cid: course.key }),
-              sectionButton("See more details", "course_details", { cid: course.key })              
+              sectionButton("Add to cart", "add_cart", {
+                course_Id: course.key,
+                course_Cost: coursecost
+              }),
+              sectionButton("See more details", "course_details", {
+                course_Id: course.key,
+                course_Cost: coursecost
+              })
             ]
           });
         }
       });
-      sendButtonMessages(recipientId,templateElements)
+      sendButtonMessages(recipientId, templateElements);
       console.log("templateElements-->" + JSON.stringify(templateElements));
-    //   sendListButtonMessages(recipientId,templateElements)
+      //   sendListButtonMessages(recipientId,templateElements)
     },
     function(err) {
       console.error("%s; %s", err.message, url);
@@ -484,7 +528,8 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
   console.log("requestPayload.action--" + payloadAction);
   switch (payloadAction) {
     //process buttons
-    case "1":
+    case "add_cart":
+      createUserAddCart(recipientId, requestPayload);
       break;
 
     default:
@@ -551,6 +596,49 @@ function call_Thirday_Party_API(endPoint, method, post_body, json) {
       resolve(JSON.parse(body));
     });
   });
+}
+
+function createUserAddCart(recipientId, payloadAction) {
+  var recipientId = recipientId;
+  var courseID = payloadAction.course_Id;
+  var courseCost = payloadAction.course_Cost;
+  var userObject = {
+    user_id: recipientId,
+    courselist: [
+      {
+        course_offered: "udacity",
+        course_id: courseID,
+        course_cost:courseCost,
+        add_to_cart: "yes",
+        paid : "No",
+        LoanRequested : "yes"
+      }
+    ]
+  };
+  db.collection("user").save(userObject, (err, result) => {
+    if (err) return console.log(err);
+
+    console.log("saved to database");
+    var templateElements = [];
+    templateElements = [
+      {
+        content_type: "text",
+        title: "Pay now",
+        payload: '{"Action":"PayNow"}'
+      },
+      {
+        content_type: "text",
+        title: "Apply for Loan",
+        payload: '{"Action":"Loan"}'
+      }
+    ];
+    sendQuickReply(
+      recipientId,
+      "How you would like to Cover cost ?",
+      templateElements
+    );
+  });
+  // sendQuickReply
 }
 
 function call_someother_API(endPoint, method, post_body, json) {
