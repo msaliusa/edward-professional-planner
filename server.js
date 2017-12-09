@@ -16,6 +16,7 @@ const apiaiApp = apiai(APIAI_TOKEN);
 const moment = require("moment");
 const str2json = require("string-to-json");
 const HashMap = require("hashmap").HashMap;
+const _ = require("underscore");
 var map = new HashMap();
 
 app.set("port", process.env.PORT || 5000);
@@ -354,11 +355,15 @@ function prepareCourseList(recipientId, searchTags) {
       var matchCourses = {};
       var key = "MatchedCourses";
       matchCourses[key] = [];
-      var courseList = data.courses;
+      //var courseList = data.courses;
       var searchCourse = searchTags.replace("_", " ").toUpperCase();
       console.log("searchCourse-" + searchCourse);
+  var order_Level = ["beginner", "intermediate", "advanced", undefined];
+  var courseList = _.sortBy(data.courses, function(obj){ 
+      return _.indexOf(order_Level, obj.level);
+  });
 
-      data.courses.forEach(function(course) {
+     courseList.forEach(function(course) {
         if (
           course.title.toUpperCase().indexOf(searchCourse) > -1 ||
           course.subtitle.toUpperCase().indexOf(searchCourse) > -1 
@@ -372,15 +377,17 @@ function prepareCourseList(recipientId, searchTags) {
           templateElements.push({
             title: course.title,
             subtitle: course.subtitle + "\n Level : " + course_level,
+            image_url: course.image,
             buttons: [
-              sectionButton("Add to cart", "Add_cart", { cid: course.key })
+              sectionButton("Add to cart", "add_cart", { cid: course.key }),
+              sectionButton("See more details", "course_details", { cid: course.key })              
             ]
           });
         }
       });
-
+      sendButtonMessages(recipientId,templateElements)
       console.log("templateElements-->" + JSON.stringify(templateElements));
-      sendListButtonMessages(recipientId,templateElements)
+    //   sendListButtonMessages(recipientId,templateElements)
     },
     function(err) {
       console.error("%s; %s", err.message, url);
