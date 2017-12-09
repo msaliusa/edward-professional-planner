@@ -14,6 +14,8 @@ const moment_tz = require("moment-timezone");
 const app = express();
 const apiaiApp = apiai(APIAI_TOKEN);
 const moment = require("moment");
+const str2json = require("string-to-json");
+
 app.set("port", process.env.PORT || 5000);
 let currentTime = moment_tz();
 let estTimeStamp = moment_tz.tz(currentTime, "America/Toronto").format();
@@ -74,25 +76,32 @@ app.post("/webhook", function(req, res) {
         }
         console.log(
           "[app.post] Webhook received a messagingEvent with properties:\n ",
-          +propertyNames.join()
+          +JSON.stringify(messagingEvent)
         );
- 
+
         if (messagingEvent.message) {
-            let sender_ID = messagingEvent.sender.id;  
-            let fb_user_endPoint=sender_ID+"?fields=first_name,last_name&access_token="+config.page_access_token;
+          if (messagingEvent.message.quick_reply) {
+            console.log("In quick reply..");
+            receivedQuickReply(messagingEvent);
+          } else {
+            let sender_ID = messagingEvent.sender.id;
+            let fb_user_endPoint =
+              sender_ID +
+              "?fields=first_name,last_name&access_token=" +
+              config.page_access_token;
             call_FB_API(fb_user_endPoint, "GET", "", true).then(
-                function(data) {
-                  console.log("data--" + JSON.stringify(data));
-                  var userName = data.first_name+' '+data.last_name;
-                  receivedMessage(messagingEvent,userName);
-                },
-                function(err) {
-                  console.error("%s; %s", err.message, url);
-                  console.log("%j", err.res.statusCode);
-                }
-              );
-          // someone sent a message
-          
+              function(data) {
+                console.log("data--" + JSON.stringify(data));
+                var userName = data.first_name + " " + data.last_name;
+                receivedMessage(messagingEvent, userName);
+              },
+              function(err) {
+                console.error("%s; %s", err.message, url);
+                console.log("%j", err.res.statusCode);
+              }
+            );
+            // someone sent a message
+          }
         } else if (messagingEvent.delivery) {
           // messenger platform sent a delivery confirmation
           receivedDeliveryConfirmation(messagingEvent);
@@ -108,6 +117,35 @@ app.post("/webhook", function(req, res) {
     });
   }
 });
+
+/**
+ *
+ *
+ */
+
+function receivedQuickReply(event) {
+  var senderID = event.sender.id;
+  var recipientID = event.recipient.id;
+  var timeOfPostback = event.timestamp;
+  //   var quickReplyAction = JSON.stringify(event.message.quick_reply.payload);
+  //   var quickReplyActionJSON=JSON.parse(quickReplyAction.replace(/'/g, '"'));
+  var quickReplyAction = JSON.parse(event.message.quick_reply.payload);
+
+  console.log(JSON.stringify(event));
+  console.log("quickReplyAction->" + quickReplyAction.Action);
+switch(quickReplyAction.Action){
+
+    case 'Course_Search' :    console.log("quickReplyAction-Course_Search-Title>" + quickReplyAction.Title);
+    
+             
+    break;
+
+    default:
+    break;
+
+}
+  console.log("quickReplyAction->" + quickReplyAction.Title);
+}
 
 /*
  * Postback Event
@@ -161,7 +199,7 @@ function receivedDeliveryConfirmation(event) {
 
 /* Received message from FB-> send it to api.ai to get action -> GET query from API.ai for the text */
 
-function receivedMessage(event,userName) {
+function receivedMessage(event, userName) {
   console.log(JSON.stringify(event));
   let sender = event.sender.id;
   let text = event.message.text;
@@ -189,13 +227,13 @@ function receivedMessage(event,userName) {
       switch (aiTextAction) {
         case "welcome":
           // sendLoginButton(sender);
-          sendWelcomeButton(sender,aiTextResponse,userName);
+          sendWelcomeButton(sender, aiTextResponse, userName);
           break;
 
         case "recommend":
-          get_Recommendation(sender, aiParameters);
+          //get_Recommendation(sender, aiParameters);
           break;
-         
+
         default:
           console.log(
             "\n\nswitch to prepareSendTextMessage Time Stamp :" +
@@ -223,8 +261,7 @@ function sendLoginButton(recipientId, templateElements) {
 
   var templateElements = [];
 
-  var oAuth_url =
-    "" ;
+  var oAuth_url = "";
 
   templateElements.push({
     title: "Login to Your acccounts",
@@ -249,7 +286,6 @@ function sectionButton(title, action, options) {
     payload: JSON.stringify(payload)
   };
 }
-
 
 function sendButtonMessages(recipientId, templateElements) {
   console.log("[sendButtonMessages] Sending the buttons " + templateElements);
@@ -293,61 +329,55 @@ function sendButtonTemplates(recipientId, templateElements) {
   sendMessagetoFB(messageData);
 }
 
+function sendQuickReply(recipientId, text, quickReplyElements) {
+  var messageData = {
+    recipient: {
+      id: recipientId
+    },
+    message: {
+      text: text,
+      quick_replies: quickReplyElements
+    }
+  };
 
-
-function sendQuickReply(recipientId,text,quickReplyElements)
-{
-
-    var messageData = {
-        recipient: {
-          id: recipientId
-        },
-        message:{
-            "text": text,
-            "quick_replies":quickReplyElements
-  
-          }
-      };
-
-      sendMessagetoFB(messageData);
-
-
+  sendMessagetoFB(messageData);
 }
 
-function sendWelcomeButton(recipientId,aiTextResponse,userName) {
-    var templateElements = [];
-//for now static ..later it can be fecthed from some other API'S
+function sendWelcomeButton(recipientId, aiTextResponse, userName) {
+  var templateElements = [];
+  //for now static ..later it can be fecthed from some other API'S
 
-templateElements = 
-[
+  templateElements = [
     {
-        "content_type":"text",
-        "title":"Big Data",
-        "payload":"Big_Data"
+      content_type: "text",
+      title: "Big Data",
+      payload: '{"Action":"Course_Search", "Title":"Big_Data"}'
     },
     {
-        "content_type":"text",
-        "title":"AI",
-        "payload":"Artificial_Engineering"
+      content_type: "text",
+      title: "AI",
+      payload: '{"Action":"Course_Search", "Title":"Artificial_Engineering"}'
     },
     {
-        "content_type":"text",
-        "title":"Deep Learning",
-        "payload":"Deep_Learning"
+      content_type: "text",
+      title: "Deep Learning",
+      payload: '{"Action":"Course_Search", "Title":"Deep_Learning"}'
     },
     {
-        "content_type":"text",
-        "title":"Web Development",
-        "payload":"Web_Development"
+      content_type: "text",
+      title: "Web Development",
+      payload: '{"Action":"Course_Search", "Title":"Web_Development"}'
     }
-];
+  ];
 
-  sendQuickReply(recipientId, aiTextResponse.replace('@UserName',userName),templateElements);
+  sendQuickReply(
+    recipientId,
+    aiTextResponse.replace("@UserName", userName),
+    templateElements
+  );
 
   // });
 }
-
-
 
 function processPayLoad(recipientId, requestForHelpOnFeature) {
   var templateElements = [];
@@ -374,9 +404,8 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
   let payloadAction = requestPayload.action;
   console.log("requestPayload.action--" + payloadAction);
   switch (payloadAction) {
-      //process buttons
+    //process buttons
     case "1":
-
       break;
 
     default:
@@ -403,7 +432,7 @@ function sendMessagetoFB(messageData) {
   console.log("Send Message method :-" + JSON.stringify(messageData));
   request(
     {
-      url: config.fb_graph_api+"/me/messages",
+      url: config.fb_graph_api + "/me/messages",
       qs: { access_token: PAGE_ACCESS_TOKEN },
       method: "POST",
       json: messageData
@@ -423,27 +452,27 @@ function prepareSendTextMessage(sender, aiText) {
   sendMessagetoFB(messageData);
 }
 
-function call_FB_API(endPoint, method, post_body, json){
-    var url_endppoint = config.fb_graph_api + '/'+endPoint;
-    console.log(url_endppoint);
-    json = json || false;
-    var requestObj = {
-      url: url_endppoint,
-      method: method,
-    };
-      return new promise(function(resolve, reject) {
-        request(requestObj, function(err, response, body) {
-          if (err || response.statusCode !== 200) {
-            console.log("api call error-n-" + JSON.stringify(body));
-            return reject(err);
-          }
-  
-          console.log("api call sucess-\n-");
-  
-          resolve(JSON.parse(body));
-        });
-      });
-    }
+function call_FB_API(endPoint, method, post_body, json) {
+  var url_endppoint = config.fb_graph_api + "/" + endPoint;
+  console.log(url_endppoint);
+  json = json || false;
+  var requestObj = {
+    url: url_endppoint,
+    method: method
+  };
+  return new promise(function(resolve, reject) {
+    request(requestObj, function(err, response, body) {
+      if (err || response.statusCode !== 200) {
+        console.log("api call error-n-" + JSON.stringify(body));
+        return reject(err);
+      }
+
+      console.log("api call sucess-\n-");
+
+      resolve(JSON.parse(body));
+    });
+  });
+}
 
 function call_someother_API(endPoint, method, post_body, json) {
   var url_endppoint = url + endPoint;
@@ -453,8 +482,7 @@ function call_someother_API(endPoint, method, post_body, json) {
     var requestObj = {
       url: url_endppoint,
       method: method,
-      headers: {
-      },
+      headers: {},
       form: post_body
     };
     return new promise(function(resolve, reject) {
@@ -475,8 +503,7 @@ function call_someother_API(endPoint, method, post_body, json) {
     json = json || false;
     var requestObj = {
       url: url_endppoint,
-      method: method,
-
+      method: method
     };
     return new promise(function(resolve, reject) {
       request(requestObj, function(err, response, body) {
@@ -493,18 +520,14 @@ function call_someother_API(endPoint, method, post_body, json) {
   }
 }
 
-
-
 function get_Recommendation(recipientId, aiParameters) {
   console.log("get_Recommendation--");
   var templateElements = [];
   var params = "";
-  call_API("end point", "GET", "", true).then(
+  call_someother_API("end point", "GET", "", true).then(
     function(data) {
       var variants = "";
-      data.QueryResponse.Estimate.forEach(function(item) {
-   
-      });
+      data.QueryResponse.Estimate.forEach(function(item) {});
       sendButtonMessages(recipientId, templateElements);
     },
     function(err) {
