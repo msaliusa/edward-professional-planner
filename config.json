@@ -9,11 +9,12 @@
   "api_uri": "",
   "realmId": "",
   "refresh_token": "",
-  "api_ai_token":"",
-  "fb_validation_token":"smallbizTo",
+  "api_ai_token":"31750f6250534998a89c2099f0e1d436",
+  "fb_validation_token":"edwardapp",
   "qb_access_token": "",
   "fintech_config":{
   "apikey":"",
     "accesskey":""
-  }
+  },
+  "fb_graph_api":"https://graph.facebook.com/v2.6/"
 }
