@@ -15,6 +15,7 @@ const app = express();
 const apiaiApp = apiai(APIAI_TOKEN);
 const moment = require("moment");
 const str2json = require("string-to-json");
+var CircularJSON = require('circular-json');
 const HashMap = require("hashmap").HashMap;
 const _ = require("underscore");
 var map = new HashMap();
@@ -105,12 +106,13 @@ app.post("/webhook", function(req, res) {
         for (var prop in messagingEvent) {
           propertyNames.push(prop);
         }
-        console.log(
-          "[app.post] Webhook received a messagingEvent with properties:\n ",
-          +JSON.stringify(messagingEvent)
-        );
-        //
+       
+        
         let sender_ID = messagingEvent.sender.id;
+        console.log(
+          "[app.post] Webhook received a messagingEvent with sender_ID:- ",
+          +sender_ID
+        );
         let fb_user_endPoint =
           sender_ID +
           "?fields=first_name,last_name&access_token=" +
@@ -122,12 +124,12 @@ app.post("/webhook", function(req, res) {
           true
         ).then(
           function(data) {
-            console.log("data--" + JSON.stringify(data));
+            // console.log("data--" + JSON.stringify(data));
             var userName = data.first_name + " " + data.last_name;
 
             if (messagingEvent.message) {
               if (messagingEvent.message.quick_reply) {
-                console.log("In quick reply..");
+                // console.log("In quick reply..");
                 receivedQuickReply(messagingEvent, userName);
               } else {
                 receivedMessage(messagingEvent, userName);
@@ -139,9 +141,9 @@ app.post("/webhook", function(req, res) {
               // user replied by tapping one of our postback buttons
               receivedPostback(messagingEvent, userName);
             } else {
-              console.log(
-                "[app.post] Webhook is not prepared to handle this message."
-              );
+              // console.log(
+              //   "[app.post] Webhook is not prepared to handle this message :"+JSON.stringify(messagingEvent)
+              // );
             }
           },
           function(err) {
@@ -154,11 +156,6 @@ app.post("/webhook", function(req, res) {
   }
 });
 
-/**
- *
- *
- */
-
 function receivedQuickReply(event, userName) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
@@ -167,7 +164,7 @@ function receivedQuickReply(event, userName) {
   //   var quickReplyActionJSON=JSON.parse(quickReplyAction.replace(/'/g, '"'));
   var quickReplyAction = JSON.parse(event.message.quick_reply.payload);
 
-  console.log(JSON.stringify(event));
+  console.log("Received event:  "+JSON.stringify(event));
   console.log("quickReplyAction->" + quickReplyAction.Action);
   switch (quickReplyAction.Action) {
     case "Course_Search":
@@ -181,6 +178,12 @@ function receivedQuickReply(event, userName) {
       console.log("quickReplyAction-Loan>" + quickReplyAction);
       prepareLoan(senderID, userName);
       break;
+
+    case "AddMore":
+      showMoreCourses(senderID);
+      break;
+    case "Payment":
+      showPaymentOptions(senderID);
       break;
 
     default:
@@ -263,8 +266,6 @@ function receivedMessage(event, userName) {
       let aiTextAction = response.result.action;
       let aiTextResponse = response.result.fulfillment.speech;
       let aiParameters = response.result.parameters;
-      console.log("Returned from NLP API AI-->" + aiTextAction);
-      console.log("Returned from NLP API AI-aiParameters->" + aiTextResponse);
 
       switch (aiTextAction) {
         case "welcome":
@@ -275,6 +276,11 @@ function receivedMessage(event, userName) {
         case "recommend":
           prepareCourseList(sender, aiParameters.field_type);
           break;
+
+          case "PaymentOptions":
+          showPaymentOptions(sender)
+          break;
+
 
         default:
           console.log(
@@ -330,7 +336,6 @@ function sectionButton(title, action, options) {
 }
 
 function sendButtonMessages(recipientId, templateElements) {
-  console.log("[sendButtonMessages] Sending the buttons " + templateElements);
 
   var messageData = {
     recipient: {
@@ -385,12 +390,78 @@ function sendQuickReply(recipientId, text, quickReplyElements) {
   sendMessagetoFB(messageData);
 }
 
-
-function prepareLoan(){
-//query the db with loan thign and then ...
+function prepareLoan() {
+  //query the db with loan thign and then ...
 
 }
+function showMoreCourses(recipientId) {
+  var templateElements = [];
+  //for now static ..later it can be fecthed from some other API'S
 
+  templateElements = [
+    {
+      content_type: "text",
+      title: "Big Data",
+      payload: '{"Action":"Course_Search", "Title":"Big_Data"}'
+    },
+    {
+      content_type: "text",
+      title: "AI",
+      payload: '{"Action":"Course_Search", "Title":"Artificial_Engineering"}'
+    },
+    {
+      content_type: "text",
+      title: "Deep Learning",
+      payload: '{"Action":"Course_Search", "Title":"Deep_Learning"}'
+    },
+    {
+      content_type: "text",
+      title: "Web Development",
+      payload: '{"Action":"Course_Search", "Title":"Web_Development"}'
+    }
+  ];
+
+  sendQuickReply(
+    recipientId,
+    "could you let me know what is your interested or choose the following options.",
+    templateElements
+  );
+
+}
+function showPaymentOptions(recipientId) {
+  var templateElements = [];
+  console.log("retrieved recipientId :->" + recipientId);
+  var totalCost= 0;
+  db.collection("user").findOne({ user_id: recipientId }, function(err, user) {
+    if (err) throw err;
+    user.courselist.forEach(function(course) {
+    if(course.LoanRequested!="yes" && course.paid!='yes')
+       totalCost=totalCost+course.course_cost;
+       
+    });
+    console.log("retrieved totalCost :->" + totalCost);
+    
+    templateElements = [
+      {
+        content_type: "text",
+        title: "Pay now",
+        payload: '{"Action":"PayNow"}'
+      },
+      {
+        content_type: "text",
+        title: "Apply for Loan",
+        payload: '{"Action":"Loan"}'
+      }
+    ];
+    sendQuickReply(
+      recipientId,"Total Cost for the courses is $"+ totalCost+
+      "\nHow you would like to Cover cost of ?",
+      templateElements
+    );
+
+  });
+
+}
 
 function prepareCourseList(recipientId, searchTags) {
   call_Thirday_Party_API(config.udacity_api, "GET", "", true).then(
@@ -442,7 +513,6 @@ function prepareCourseList(recipientId, searchTags) {
         }
       });
       sendButtonMessages(recipientId, templateElements);
-      console.log("templateElements-->" + JSON.stringify(templateElements));
       //   sendListButtonMessages(recipientId,templateElements)
     },
     function(err) {
@@ -552,7 +622,6 @@ function processPayLoad(recipientId, requestForHelpOnFeature, userName) {
 }
 
 function prepareTextMessage(recipientId, variants, options) {
-  console.log("prepareTextMessage :-" + variants);
 
   var messageData = {
     recipient: {
@@ -562,7 +631,6 @@ function prepareTextMessage(recipientId, variants, options) {
       text: variants
     }
   };
-  console.log("prepareTextMessage :-" + "messageData");
 
   sendMessagetoFB(messageData);
 }
@@ -578,9 +646,7 @@ function sendMessagetoFB(messageData) {
     },
     (error, response) => {
       if (error) {
-        console.log("Error sending message: ", error);
       } else if (response.body.error) {
-        console.log("Error: in send message ", response.body.error);
       }
     }
   );
@@ -593,7 +659,6 @@ function prepareSendTextMessage(sender, aiText) {
 
 function call_Thirday_Party_API(endPoint, method, post_body, json) {
   var url_endppoint = endPoint;
-  console.log(url_endppoint);
   json = json || false;
   var requestObj = {
     url: url_endppoint,
@@ -602,11 +667,8 @@ function call_Thirday_Party_API(endPoint, method, post_body, json) {
   return new promise(function(resolve, reject) {
     request(requestObj, function(err, response, body) {
       if (err || response.statusCode !== 200) {
-        console.log("api call error-n-" + JSON.stringify(body));
         return reject(err);
       }
-
-      console.log("api call sucess-\n-");
 
       resolve(JSON.parse(body));
     });
@@ -626,7 +688,7 @@ function createUserAddCart(recipientId, payloadAction, userName) {
     course_cost: courseCost,
     add_to_cart: "yes",
     paid: "No",
-    LoanRequested: "yes"
+    LoanRequested: ""
   };
   var userObject = {
     user_id: recipientId,
@@ -638,7 +700,7 @@ function createUserAddCart(recipientId, payloadAction, userName) {
     if (err) throw err;
     console.log("Checking user:" + user);
     if (user) {
-      console.log("user already in db");
+      console.log("user already in db->"+recipientId);
       db
         .collection("user")
         .update(
@@ -651,28 +713,28 @@ function createUserAddCart(recipientId, payloadAction, userName) {
         if (err) return console.log(err);
       });
     }
+
     var templateElements = [];
     templateElements = [
       {
         content_type: "text",
-        title: "Pay now",
-        payload: '{"Action":"PayNow"}'
+        title: "Add more courses",
+        payload: '{"Action":"AddMore"}'
       },
       {
         content_type: "text",
-        title: "Apply for Loan",
-        payload: '{"Action":"Loan"}'
+        title: "Payment Options",
+        payload: '{"Action":"Payment"}'
       }
     ];
     sendQuickReply(
       recipientId,
-      "Successfully Added to Cart : How you would like to Cover cost ?",
+      "Successfully Added to Cart : Choose one of the option below ?",
       templateElements
     );
   });
 
   console.log("here");
-
 }
 
 function call_someother_API(endPoint, method, post_body, json) {
