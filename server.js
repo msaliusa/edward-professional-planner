@@ -133,17 +133,17 @@ function receivedQuickReply(event) {
 
   console.log(JSON.stringify(event));
   console.log("quickReplyAction->" + quickReplyAction.Action);
-switch(quickReplyAction.Action){
+  switch (quickReplyAction.Action) {
+    case "Course_Search":
+      console.log(
+        "quickReplyAction-Title>" + quickReplyAction.Title
+      );
 
-    case 'Course_Search' :    console.log("quickReplyAction-Course_Search-Title>" + quickReplyAction.Title);
-    
-             
-    break;
+      break;
 
     default:
-    break;
-
-}
+      break;
+  }
   console.log("quickReplyAction->" + quickReplyAction.Title);
 }
 
