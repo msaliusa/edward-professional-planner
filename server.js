@@ -19,8 +19,7 @@ const HashMap = require("hashmap").HashMap;
 const _ = require("underscore");
 var map = new HashMap();
 const MongoClient = require("mongodb").MongoClient;
-const MONGO_URL =config.mlab_url;
-  ;
+const MONGO_URL = config.mlab_url;
 var db;
 MongoClient.connect(MONGO_URL, (err, database) => {
   if (err) return console.log(err);
@@ -110,46 +109,46 @@ app.post("/webhook", function(req, res) {
           "[app.post] Webhook received a messagingEvent with properties:\n ",
           +JSON.stringify(messagingEvent)
         );
+        //
+        let sender_ID = messagingEvent.sender.id;
+        let fb_user_endPoint =
+          sender_ID +
+          "?fields=first_name,last_name&access_token=" +
+          config.page_access_token;
+        call_Thirday_Party_API(
+          config.fb_graph_api + "/" + fb_user_endPoint,
+          "GET",
+          "",
+          true
+        ).then(
+          function(data) {
+            console.log("data--" + JSON.stringify(data));
+            var userName = data.first_name + " " + data.last_name;
 
-        if (messagingEvent.message) {
-          if (messagingEvent.message.quick_reply) {
-            console.log("In quick reply..");
-            receivedQuickReply(messagingEvent);
-          } else {
-            let sender_ID = messagingEvent.sender.id;
-            let fb_user_endPoint =
-              sender_ID +
-              "?fields=first_name,last_name&access_token=" +
-              config.page_access_token;
-            call_Thirday_Party_API(
-              config.fb_graph_api + "/" + fb_user_endPoint,
-              "GET",
-              "",
-              true
-            ).then(
-              function(data) {
-                console.log("data--" + JSON.stringify(data));
-                var userName = data.first_name + " " + data.last_name;
+            if (messagingEvent.message) {
+              if (messagingEvent.message.quick_reply) {
+                console.log("In quick reply..");
+                receivedQuickReply(messagingEvent, userName);
+              } else {
                 receivedMessage(messagingEvent, userName);
-              },
-              function(err) {
-                console.error("%s; %s", err.message, url);
-                console.log("%j", err.res.statusCode);
               }
-            );
-            // someone sent a message
+            } else if (messagingEvent.delivery) {
+              // messenger platform sent a delivery confirmation
+              receivedDeliveryConfirmation(messagingEvent);
+            } else if (messagingEvent.postback) {
+              // user replied by tapping one of our postback buttons
+              receivedPostback(messagingEvent, userName);
+            } else {
+              console.log(
+                "[app.post] Webhook is not prepared to handle this message."
+              );
+            }
+          },
+          function(err) {
+            console.error("%s; %s", err.message, url);
+            console.log("%j", err.res.statusCode);
           }
-        } else if (messagingEvent.delivery) {
-          // messenger platform sent a delivery confirmation
-          receivedDeliveryConfirmation(messagingEvent);
-        } else if (messagingEvent.postback) {
-          // user replied by tapping one of our postback buttons
-          receivedPostback(messagingEvent);
-        } else {
-          console.log(
-            "[app.post] Webhook is not prepared to handle this message."
-          );
-        }
+        );
       });
     });
   }
@@ -160,7 +159,7 @@ app.post("/webhook", function(req, res) {
  *
  */
 
-function receivedQuickReply(event) {
+function receivedQuickReply(event, userName) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
   var timeOfPostback = event.timestamp;
@@ -174,10 +173,14 @@ function receivedQuickReply(event) {
     case "Course_Search":
       prepareCourseList(senderID, quickReplyAction.Title);
       break;
-      case "PayNow":
+    case "PayNow":
       console.log("quickReplyAction-Loan>" + quickReplyAction);
-      case "Loan":
+      preparePayNow(senderID, quickReplyAction.Title);
+      break;
+    case "Loan":
       console.log("quickReplyAction-Loan>" + quickReplyAction);
+      prepareLoan(senderID, userName);
+      break;
       break;
 
     default:
@@ -193,7 +196,7 @@ function receivedQuickReply(event) {
  * https://developers.facebook.com/docs/messenger-platform/webhook-reference/postback-received
  * 
  */
-function receivedPostback(event) {
+function receivedPostback(event, userName) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
   var timeOfPostback = event.timestamp;
@@ -211,7 +214,7 @@ function receivedPostback(event) {
     timeOfPostback
   );
 
-  processPayLoad(senderID, payload);
+  processPayLoad(senderID, payload, userName);
 }
 
 function receivedDeliveryConfirmation(event) {
@@ -381,6 +384,14 @@ function sendQuickReply(recipientId, text, quickReplyElements) {
 
   sendMessagetoFB(messageData);
 }
+
+
+function prepareLoan(){
+//query the db with loan thign and then ...
+
+}
+
+
 function prepareCourseList(recipientId, searchTags) {
   call_Thirday_Party_API(config.udacity_api, "GET", "", true).then(
     function(data) {
@@ -413,8 +424,9 @@ function prepareCourseList(recipientId, searchTags) {
               course.subtitle +
               "\n Level : " +
               course_level +
-              "\n Cost :" +
-              coursecost,
+              "\n Cost : " +
+              coursecost +
+              "$USD",
             image_url: course.image,
             buttons: [
               sectionButton("Add to cart", "add_cart", {
@@ -502,7 +514,7 @@ function sendWelcomeButton(recipientId, aiTextResponse, userName) {
   // });
 }
 
-function processPayLoad(recipientId, requestForHelpOnFeature) {
+function processPayLoad(recipientId, requestForHelpOnFeature, userName) {
   var templateElements = [];
   var requestPayload = JSON.parse(requestForHelpOnFeature);
   var sectionButton = function(title, action, options) {
@@ -525,12 +537,15 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
     };
   };
   let payloadAction = requestPayload.action;
-  console.log("requestPayload.action--" + payloadAction);
+  console.log("requestPayload.action-->" + payloadAction);
   switch (payloadAction) {
     //process buttons
     case "add_cart":
-      createUserAddCart(recipientId, requestPayload);
+      createUserAddCart(recipientId, requestPayload, userName);
       break;
+
+    case "Loan":
+      createLoan(recipientId, requestPayload, userName);
 
     default:
   }
@@ -598,27 +613,44 @@ function call_Thirday_Party_API(endPoint, method, post_body, json) {
   });
 }
 
-function createUserAddCart(recipientId, payloadAction) {
+function createLoan(recipientId, payloadAction, userName) {}
+
+function createUserAddCart(recipientId, payloadAction, userName) {
   var recipientId = recipientId;
   var courseID = payloadAction.course_Id;
   var courseCost = payloadAction.course_Cost;
+  // var collection=db.user;
+  var courseListArray = {
+    course_offered: "udacity",
+    course_id: courseID,
+    course_cost: courseCost,
+    add_to_cart: "yes",
+    paid: "No",
+    LoanRequested: "yes"
+  };
   var userObject = {
     user_id: recipientId,
-    courselist: [
-      {
-        course_offered: "udacity",
-        course_id: courseID,
-        course_cost:courseCost,
-        add_to_cart: "yes",
-        paid : "No",
-        LoanRequested : "yes"
-      }
-    ]
+    user_name: userName,
+    courselist: [courseListArray]
   };
-  db.collection("user").save(userObject, (err, result) => {
-    if (err) return console.log(err);
-
-    console.log("saved to database");
+  console.log("collection");
+  db.collection("user").findOne({ user_id: recipientId }, function(err, user) {
+    if (err) throw err;
+    console.log("Checking user:" + user);
+    if (user) {
+      console.log("user already in db");
+      db
+        .collection("user")
+        .update(
+          { user_id: recipientId },
+          { $push: { courselist: courseListArray } }
+        );
+    } else {
+      console.log("Creating new user account");
+      db.collection("user").save(userObject, (err, result) => {
+        if (err) return console.log(err);
+      });
+    }
     var templateElements = [];
     templateElements = [
       {
@@ -634,11 +666,13 @@ function createUserAddCart(recipientId, payloadAction) {
     ];
     sendQuickReply(
       recipientId,
-      "How you would like to Cover cost ?",
+      "Successfully Added to Cart : How you would like to Cover cost ?",
       templateElements
     );
   });
-  // sendQuickReply
+
+  console.log("here");
+
 }
 
 function call_someother_API(endPoint, method, post_body, json) {
