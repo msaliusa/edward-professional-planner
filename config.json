@@ -16,5 +16,6 @@
   "apikey":"",
     "accesskey":""
   },
-  "fb_graph_api":"https://graph.facebook.com/v2.6/"
+  "fb_graph_api":"https://graph.facebook.com/v2.6/",
+  "udacity_api":"https://www.udacity.com/public-api/v1/courses"
 }

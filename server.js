@@ -15,6 +15,8 @@ const app = express();
 const apiaiApp = apiai(APIAI_TOKEN);
 const moment = require("moment");
 const str2json = require("string-to-json");
+const HashMap = require("hashmap").HashMap;
+var map = new HashMap();
 
 app.set("port", process.env.PORT || 5000);
 let currentTime = moment_tz();
@@ -89,7 +91,12 @@ app.post("/webhook", function(req, res) {
               sender_ID +
               "?fields=first_name,last_name&access_token=" +
               config.page_access_token;
-            call_FB_API(fb_user_endPoint, "GET", "", true).then(
+            call_Thirday_Party_API(
+              config.fb_graph_api + "/" + fb_user_endPoint,
+              "GET",
+              "",
+              true
+            ).then(
               function(data) {
                 console.log("data--" + JSON.stringify(data));
                 var userName = data.first_name + " " + data.last_name;
@@ -135,10 +142,8 @@ function receivedQuickReply(event) {
   console.log("quickReplyAction->" + quickReplyAction.Action);
   switch (quickReplyAction.Action) {
     case "Course_Search":
-      console.log(
-        "quickReplyAction-Title>" + quickReplyAction.Title
-      );
-
+      console.log("quickReplyAction-Title>" + quickReplyAction.Title);
+      prepareCourseList(senderID, quickReplyAction.Title);
       break;
 
     default:
@@ -342,6 +347,73 @@ function sendQuickReply(recipientId, text, quickReplyElements) {
 
   sendMessagetoFB(messageData);
 }
+function prepareCourseList(recipientId, searchTags) {
+  call_Thirday_Party_API(config.udacity_api, "GET", "", true).then(
+    function(data) {
+      var templateElements = [];
+      var matchCourses = {};
+      var key = "MatchedCourses";
+      matchCourses[key] = [];
+      var courseList = data.courses;
+      var searchCourse = searchTags.replace("_", " ").toUpperCase();
+      console.log("searchCourse-" + searchCourse);
+
+      data.courses.forEach(function(course) {
+        if (
+          course.title.toUpperCase().indexOf(searchCourse) > -1 ||
+          course.subtitle.toUpperCase().indexOf(searchCourse) > -1 
+          ||
+          course.tags
+            .toString()
+            .toUpperCase()
+            .indexOf(searchCourse) > -1
+        ) {
+            var course_level = course.level ?course.level:"Not Avaliable";
+          templateElements.push({
+            title: course.title,
+            subtitle: course.subtitle + "\n Level : " + course_level,
+            buttons: [
+              sectionButton("Add to cart", "Add_cart", { cid: course.key })
+            ]
+          });
+        }
+      });
+
+      console.log("templateElements-->" + JSON.stringify(templateElements));
+      sendListButtonMessages(recipientId,templateElements)
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+    }
+  );
+}
+
+function sendListButtonMessages(recipientId, matchCourses) {
+  var messageData = {
+    recipient: {
+      id: recipientId
+    },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "list",
+          top_element_style: "compact",
+          elements: matchCourses,
+          buttons: [
+            {
+              title: "View More",
+              type: "postback",
+              payload: "payload"
+            }
+          ]
+        }
+      }
+    }
+  };
+  sendMessagetoFB(messageData);
+}
 
 function sendWelcomeButton(recipientId, aiTextResponse, userName) {
   var templateElements = [];
@@ -429,7 +501,7 @@ function prepareTextMessage(recipientId, variants, options) {
 }
 
 function sendMessagetoFB(messageData) {
-  console.log("Send Message method :-" + JSON.stringify(messageData));
+  //   console.log("Send Message method :-" + JSON.stringify(messageData));
   request(
     {
       url: config.fb_graph_api + "/me/messages",
@@ -452,8 +524,8 @@ function prepareSendTextMessage(sender, aiText) {
   sendMessagetoFB(messageData);
 }
 
-function call_FB_API(endPoint, method, post_body, json) {
-  var url_endppoint = config.fb_graph_api + "/" + endPoint;
+function call_Thirday_Party_API(endPoint, method, post_body, json) {
+  var url_endppoint = endPoint;
   console.log(url_endppoint);
   json = json || false;
   var requestObj = {
