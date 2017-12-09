@@ -76,10 +76,23 @@ app.post("/webhook", function(req, res) {
           "[app.post] Webhook received a messagingEvent with properties:\n ",
           +propertyNames.join()
         );
-
+ 
         if (messagingEvent.message) {
+            let sender_ID = messagingEvent.sender.id;  
+            let fb_user_endPoint=sender_ID+"?fields=first_name,last_name&access_token="+config.page_access_token;
+            call_FB_API(fb_user_endPoint, "GET", "", true).then(
+                function(data) {
+                  console.log("data--" + JSON.stringify(data));
+                  var userName = data.first_name+' '+data.last_name;
+                  receivedMessage(messagingEvent,userName);
+                },
+                function(err) {
+                  console.error("%s; %s", err.message, url);
+                  console.log("%j", err.res.statusCode);
+                }
+              );
           // someone sent a message
-          receivedMessage(messagingEvent);
+          
         } else if (messagingEvent.delivery) {
           // messenger platform sent a delivery confirmation
           receivedDeliveryConfirmation(messagingEvent);
@@ -148,7 +161,7 @@ function receivedDeliveryConfirmation(event) {
 
 /* Received message from FB-> send it to api.ai to get action -> GET query from API.ai for the text */
 
-function receivedMessage(event) {
+function receivedMessage(event,userName) {
   console.log(JSON.stringify(event));
   let sender = event.sender.id;
   let text = event.message.text;
@@ -171,12 +184,12 @@ function receivedMessage(event) {
       let aiTextResponse = response.result.fulfillment.speech;
       let aiParameters = response.result.parameters;
       console.log("Returned from NLP API AI-->" + aiTextAction);
-      console.log("Returned from NLP API AI-aiParameters->" + aiParameters);
+      console.log("Returned from NLP API AI-aiParameters->" + aiTextResponse);
 
       switch (aiTextAction) {
-        case "input.welcome":
+        case "welcome":
           // sendLoginButton(sender);
-          sendWelcomeButton(sender);
+          sendWelcomeButton(sender,aiTextResponse,userName);
           break;
 
         case "recommend":
@@ -210,15 +223,15 @@ function sendLoginButton(recipientId, templateElements) {
 
   var templateElements = [];
 
-  var oAuth_QBurl =
-    "https://appcenter.intuit.com/connect/oauth2?client_id=" + qb_client_id;
+  var oAuth_url =
+    "" ;
 
   templateElements.push({
-    title: "Login to Your Quickbooks",
+    title: "Login to Your acccounts",
     buttons: [
       {
         type: "account_link",
-        url: oAuth_QBurl
+        url: oAuth_url
       }
     ]
   });
@@ -280,18 +293,56 @@ function sendButtonTemplates(recipientId, templateElements) {
   sendMessagetoFB(messageData);
 }
 
-function sendWelcomeButton(recipientId) {
-  var templateElements = [];
 
-  templateElements.push({
-    title: "What you like to do today",
-    buttons: [
-      sectionButton("send fb button", "action", {}),
-      sectionButton("send fb button", "action", {})
-    ]
-  });
 
-  sendButtonMessages(recipientId, templateElements);
+function sendQuickReply(recipientId,text,quickReplyElements)
+{
+
+    var messageData = {
+        recipient: {
+          id: recipientId
+        },
+        message:{
+            "text": text,
+            "quick_replies":quickReplyElements
+  
+          }
+      };
+
+      sendMessagetoFB(messageData);
+
+
+}
+
+function sendWelcomeButton(recipientId,aiTextResponse,userName) {
+    var templateElements = [];
+//for now static ..later it can be fecthed from some other API'S
+
+templateElements = 
+[
+    {
+        "content_type":"text",
+        "title":"Big Data",
+        "payload":"Big_Data"
+    },
+    {
+        "content_type":"text",
+        "title":"AI",
+        "payload":"Artificial_Engineering"
+    },
+    {
+        "content_type":"text",
+        "title":"Deep Learning",
+        "payload":"Deep_Learning"
+    },
+    {
+        "content_type":"text",
+        "title":"Web Development",
+        "payload":"Web_Development"
+    }
+];
+
+  sendQuickReply(recipientId, aiTextResponse.replace('@UserName',userName),templateElements);
 
   // });
 }
@@ -352,7 +403,7 @@ function sendMessagetoFB(messageData) {
   console.log("Send Message method :-" + JSON.stringify(messageData));
   request(
     {
-      url: "https://graph.facebook.com/v2.6/me/messages",
+      url: config.fb_graph_api+"/me/messages",
       qs: { access_token: PAGE_ACCESS_TOKEN },
       method: "POST",
       json: messageData
@@ -372,19 +423,27 @@ function prepareSendTextMessage(sender, aiText) {
   sendMessagetoFB(messageData);
 }
 
-function send_CompanyInfo(recipientId) {
-  call_QB_API("/companyinfo/" + config.realmId, "GET", "", true).then(
-    function(data) {
-      console.log("data--" + JSON.stringify(data));
-      var variants = data.CompanyInfo.CompanyName;
-      prepareTextMessage(recipientId, variants, "");
-    },
-    function(err) {
-      console.error("%s; %s", err.message, url);
-      console.log("%j", err.res.statusCode);
+function call_FB_API(endPoint, method, post_body, json){
+    var url_endppoint = config.fb_graph_api + '/'+endPoint;
+    console.log(url_endppoint);
+    json = json || false;
+    var requestObj = {
+      url: url_endppoint,
+      method: method,
+    };
+      return new promise(function(resolve, reject) {
+        request(requestObj, function(err, response, body) {
+          if (err || response.statusCode !== 200) {
+            console.log("api call error-n-" + JSON.stringify(body));
+            return reject(err);
+          }
+  
+          console.log("api call sucess-\n-");
+  
+          resolve(JSON.parse(body));
+        });
+      });
     }
-  );
-}
 
 function call_someother_API(endPoint, method, post_body, json) {
   var url_endppoint = url + endPoint;

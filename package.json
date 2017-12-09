@@ -1,5 +1,5 @@
 {
-  "name": "Edward Professional Planner",
+  "name": "edward-professional-planner",
   "version": "1.0.0",
   "description": "Capagemini open banking Hackathon challenge Edit",
   "main": "server.js",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vamsikt/edward-professional-planner.git"
+    "url": "git@github.com:vamsikt/edward-professional-planner.git"
   },
   "author": "",
   "license": "ISC",
