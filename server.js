@@ -280,7 +280,14 @@ function receivedMessage(event, userName) {
           case "PaymentOptions":
           showPaymentOptions(sender)
           break;
+      case "applyloan":
+      prepareLoan(sender,userName);
+      break;
+      case "email": 
 
+      sendConfirmationemail(sender,aiParameters.email,userName);
+      
+      break;
 
         default:
           console.log(
@@ -390,8 +397,32 @@ function sendQuickReply(recipientId, text, quickReplyElements) {
   sendMessagetoFB(messageData);
 }
 
-function prepareLoan() {
+function prepareLoan(recipientId,userName) {
   //query the db with loan thign and then ...
+  var templateElements = [];
+  console.log("retrieved recipientId :->" + recipientId);
+  var totalCost = 0;
+  db
+    .collection("user")
+    .findOne({ user_id: recipientId }, function(err, user) {
+      if (err) throw err;
+      user.courselist.forEach(function(course) {
+        if (
+          course.LoanRequested != "yes" &&
+          course.paid != "yes" &&
+          course.add_to_cart == "yes"
+        ) {
+          db.collection("user").update({ user_id: recipientId ,course_id: course.course_id},
+            {$set: {
+              "courselist.$.add_to_cart": "Done"
+          }},false,true
+          )
+
+        }
+      });
+      console.log("retrieved totalCost :->" + totalCost);
+      prepareSendTextMessage(recipientId,"Give your email address to finalize the loan process.")
+    });
 
 }
 function showMoreCourses(recipientId) {
@@ -426,6 +457,14 @@ function showMoreCourses(recipientId) {
     "could you let me know what is your interested or choose the following options.",
     templateElements
   );
+
+}
+
+function sendConfirmationemail(recipientId,emailID,userName){
+
+
+var message= "Hello "+userName+",\n Thank you for your order,you will receive confirmation email and we will update you when your loan is approved...:"
+prepareSendTextMessage(recipientId,message);
 
 }
 function showPaymentOptions(recipientId) {
