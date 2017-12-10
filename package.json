@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Capagemini open banking Hackathon challenge ",
   "main": "server.js",
-  
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,6 +21,7 @@
     "api.ai": "^1.0.3",
     "apiai": "^4.0.3",
     "body-parser": "^1.18.2",
+    "circular-json": "^0.4.0",
     "clarifai": "^2.5.0",
     "express": "^4.16.2",
     "hashmap": "2.3.0",
