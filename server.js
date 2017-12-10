@@ -67,19 +67,20 @@ app.get("/webhook", function(req, res) {
   }
 });
 
+
 app.get("/login", (req, res) => {
   res.sendFile(__dirname + "/public/index.html");
   // Note: __dirname is directory that contains the JavaScript source code. Try logging it and see what you get!
   // Mine was '/Users/zellwk/Projects/demo-repos/crud-express-mongo' for this app.
 });
 
-app.post("/login", (req, res) => {
+app.get("/lenders", (req, res) => {
   console.log(req.body);
   db.collection("login").save(req.body, (err, result) => {
     if (err) return console.log(err);
 
     console.log("saved to database");
-    res.sendFile(__dirname + "/public/lender_home.html");
+    res.sendFile(__dirname + "/edward-lenders/lender_home.html");
   });
 });
 
